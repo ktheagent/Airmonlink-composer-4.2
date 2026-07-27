@@ -1,0 +1,112 @@
+name: Build Windows Release
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate source
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run validate:full
+
+  build-windows:
+    name: Compile Windows x64
+    needs: validate
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run validate:full
+      - run: npm run dist:win
+      - name: Verify Windows release files
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $installer = "release/Airmonlink-Composer-1.2.0-Build40-Setup.exe"
+          $portable = "release/Airmonlink-Composer-1.2.0-Build40-Portable.exe"
+          foreach ($file in @($installer, $portable)) {
+            if (-not (Test-Path $file)) { throw "Missing expected artifact: $file" }
+            if ((Get-Item $file).Length -lt 1MB) { throw "Artifact is unexpectedly small: $file" }
+            $bytes = [System.IO.File]::ReadAllBytes((Resolve-Path $file))
+            if ($bytes[0] -ne 0x4D -or $bytes[1] -ne 0x5A) { throw "Artifact is not a Windows PE file: $file" }
+          }
+          $installerInfo = (Get-Item $installer).VersionInfo
+          $portableInfo = (Get-Item $portable).VersionInfo
+          [ordered]@{
+            installer = @{ path = $installer; size = (Get-Item $installer).Length; product = $installerInfo.ProductName; version = $installerInfo.ProductVersion }
+            portable = @{ path = $portable; size = (Get-Item $portable).Length; product = $portableInfo.ProductName; version = $portableInfo.ProductVersion }
+          } | ConvertTo-Json -Depth 5 | Set-Content release/WINDOWS-ARTIFACT-VERIFICATION.json
+
+      - name: Silent install and bounded startup smoke
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $installer = (Resolve-Path "release/Airmonlink-Composer-1.2.0-Build40-Setup.exe").Path
+          $portable = (Resolve-Path "release/Airmonlink-Composer-1.2.0-Build40-Portable.exe").Path
+          $installDir = Join-Path $env:RUNNER_TEMP "AirmonlinkComposerBuild40"
+          if (Test-Path $installDir) { Remove-Item $installDir -Recurse -Force }
+          $install = Start-Process -FilePath $installer -ArgumentList "/S", "/D=$installDir" -PassThru -Wait
+          if ($install.ExitCode -ne 0) { throw "Silent installer returned exit code $($install.ExitCode)." }
+          $installedExe = Get-ChildItem $installDir -Filter "Airmonlink Composer.exe" -Recurse -File | Select-Object -First 1
+          if (-not $installedExe) { throw "Installed executable was not found." }
+
+          function Test-BoundedLaunch([string]$Path, [string]$Label) {
+            $process = Start-Process -FilePath $Path -ArgumentList "--build-smoke-test" -PassThru
+            Start-Sleep -Seconds 8
+            if ($process.HasExited) { throw "$Label exited during the bounded startup window with code $($process.ExitCode)." }
+            Stop-Process -Id $process.Id -Force
+            Wait-Process -Id $process.Id -ErrorAction SilentlyContinue
+          }
+
+          Test-BoundedLaunch $installedExe.FullName "Installed application"
+          Test-BoundedLaunch $portable "Portable application"
+
+          $uninstaller = Get-ChildItem $installDir -Filter "Uninstall*.exe" -Recurse -File | Select-Object -First 1
+          if ($uninstaller) {
+            $uninstall = Start-Process -FilePath $uninstaller.FullName -ArgumentList "/S" -PassThru -Wait
+            if ($uninstall.ExitCode -ne 0) { throw "Silent uninstaller returned exit code $($uninstall.ExitCode)." }
+          }
+
+          [ordered]@{
+            installerExitCode = $install.ExitCode
+            installedExecutable = $installedExe.FullName
+            installedStartup = "passed"
+            portableStartup = "passed"
+            uninstallAttempted = [bool]$uninstaller
+          } | ConvertTo-Json -Depth 4 | Set-Content release/WINDOWS-SMOKE-RESULT.json
+      - name: Generate checksums
+        shell: pwsh
+        run: |
+          Get-ChildItem release -File | ForEach-Object {
+            $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
+            "$hash  $($_.Name)" | Add-Content release/SHA256SUMS.txt
+          }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Airmonlink-Composer-Windows-${{ github.run_number }}
+          path: |
+            release/*.exe
+            release/SHA256SUMS.txt
+            release/WINDOWS-ARTIFACT-VERIFICATION.json
+            release/WINDOWS-SMOKE-RESULT.json
+          if-no-files-found: error
+          retention-days: 30
