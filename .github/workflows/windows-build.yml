@@ -25,10 +25,10 @@ jobs:
     timeout-minutes: 25
     steps:
       - name: Checkout exact source
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
 
       - name: Set up Node.js 22
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v4
         with:
           node-version: '22.12.0'
           cache: npm
@@ -72,10 +72,10 @@ jobs:
       CSC_IDENTITY_AUTO_DISCOVERY: "false"
     steps:
       - name: Checkout exact source
-        uses: actions/checkout/v5
+        uses: actions/checkout@v4
 
       - name: Set up Node.js 22
-        uses: actions/setup-node/v5
+        uses: actions/setup-node@v4
         with:
           node-version: '22.12.0'
           cache: npm
@@ -100,9 +100,9 @@ jobs:
         shell: pwsh
         run: npm run preview
 
-      # Browser geometry is validated exhaustively in the Ubuntu validation job.
-      # Running Chromium CDP matrices again on Windows causes false EPERM failures
-      # when Chrome/Edge child processes retain temporary profile locks.
+      # Browser geometry is exhaustively validated in the Ubuntu validation job.
+      # Repeating Chromium CDP matrices on Windows has caused false EPERM failures
+      # when Chrome or Edge child processes retain temporary-profile locks.
       - name: Record Windows browser-validation boundary
         shell: pwsh
         run: |
@@ -123,6 +123,7 @@ jobs:
           $ErrorActionPreference = "Stop"
           $installer = "release/Airmonlink-Composer-1.2.0-Build40-Setup.exe"
           $portable = "release/Airmonlink-Composer-1.2.0-Build40-Portable.exe"
+
           foreach ($file in @($installer, $portable)) {
             if (-not (Test-Path -LiteralPath $file)) {
               throw "Missing expected artifact: $file"
@@ -174,6 +175,7 @@ jobs:
             Where-Object { $_.Name -notmatch '(?i)^uninstall' } |
             Sort-Object Length -Descending |
             Select-Object -First 1
+
           if (-not $installedExe) {
             throw "Installed application executable was not found."
           }
@@ -194,6 +196,7 @@ jobs:
           $uninstaller = Get-ChildItem -LiteralPath $installDir -Filter "Uninstall*.exe" -Recurse -File |
             Select-Object -First 1
           $uninstallExitCode = $null
+
           if ($uninstaller) {
             $uninstall = Start-Process -FilePath $uninstaller.FullName -ArgumentList "/S" -PassThru -Wait
             $uninstallExitCode = $uninstall.ExitCode
