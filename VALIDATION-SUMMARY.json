@@ -1,0 +1,68 @@
+{
+  "application": "Airmonlink Composer",
+  "version": "1.2.0",
+  "build": 40,
+  "buildVersion": "1.2.0.40",
+  "generatedAt": "2026-07-27T14:46:16.523422+00:00",
+  "githubEmbargo": "ACTIVE",
+  "projectStatus": "IN PROGRESS \u2014 NOT FINAL",
+  "sourceReleaseCandidate": true,
+  "releaseReady": false,
+  "validation": {
+    "javascriptSyntax": {
+      "passed": true,
+      "files": 85
+    },
+    "automatedTests": {
+      "passed": true,
+      "passedCount": 332,
+      "total": 332
+    },
+    "performance": {
+      "passed": true,
+      "checks": "6/6"
+    },
+    "browser": {
+      "passed": true,
+      "checks": "46/46"
+    },
+    "viewport": {
+      "passed": true,
+      "checks": "36/36",
+      "scenarios": 4
+    },
+    "pdf": {
+      "passed": true,
+      "evidence": "PDF generated and rendered during browser validation"
+    },
+    "wholeSystemSourceAuditCycles": {
+      "passed": true,
+      "cycles": 3
+    },
+    "cleanDependencyRestore": {
+      "passed": false,
+      "error": "npm ci --offline failed with ENOTCACHED for yocto-queue"
+    },
+    "restoreVerification": {
+      "passed": true,
+      "command": "npm run validate:full"
+    }
+  },
+  "windows": {
+    "compiled": false,
+    "installerConfirmed": false,
+    "portableConfirmed": false,
+    "startupTested": false,
+    "installUpgradeUninstallTested": false,
+    "blocker": "GitHub embargo is active and the local Linux environment has no Wine, NSIS or electron-builder installation."
+  },
+  "hardware": {
+    "midiTested": false,
+    "audioDeviceTested": false,
+    "printerTested": false
+  },
+  "expectedWindowsArtifacts": [
+    "Airmonlink-Composer-1.2.0-Build40-Setup.exe",
+    "Airmonlink-Composer-1.2.0-Build40-Portable.exe"
+  ]
+}
